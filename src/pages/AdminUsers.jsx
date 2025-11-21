@@ -5,6 +5,8 @@ import PageWrapper from '../components/Layout/PageWrapper.jsx' // Import bố c�
 import DataTable from '../components/DataTable.jsx' // Import bảng
 import apiClient from '../lib/apiClient.js' // HTTP client
 
+const PAGE_SIZE = 20 // Số lượng user mỗi trang
+
 const roleColors = { // Map màu role
   administrator: 'bg-lilac text-charcoal', // Màu admin
   manager: 'bg-indigo-100 text-indigo-600', // Màu manager
@@ -13,7 +15,9 @@ const roleColors = { // Map màu role
 } // Kết thúc map
 
 const fetchUsers = async () => {
-  const response = await apiClient.get('/users/getallprofile') // Gọi API danh sách user
+  const response = await apiClient.get('/users/getallprofile', {
+    params: { limit: 1000 }, // Lấy tất cả users (limit lớn để lấy hết)
+  }) // Gọi API danh sách user (lấy tất cả)
   return response.data // Trả về dữ liệu
 }
 
@@ -24,27 +28,19 @@ const membershipOptions = [
 ]
 
 const AdminUsers = () => { // Component trang user
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient() // Query client để quản lý cache
+  const [page, setPage] = useState(1) // State trang hiện tại (client-side pagination)
+  const [membershipFilter, setMembershipFilter] = useState('all') // State filter membership
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ['users'],
-    queryFn: fetchUsers,
+    queryKey: ['users'], // QueryKey không cần page vì lấy tất cả data
+    queryFn: fetchUsers, // Gọi API lấy tất cả users
   }) // Gọi API với React Query
-  const [membershipFilter, setMembershipFilter] = useState('all')
 
   const deleteMutation = useMutation({
     mutationFn: (id) => apiClient.delete(`/users/${id}`),
     onSuccess: (_response, id) => {
-      // Cập nhật cache ngay lập tức để UI đồng bộ với backend
-      queryClient.setQueryData(['users'], (old) => {
-        if (!old || !old.data || !Array.isArray(old.data.items)) return old
-        return {
-          ...old,
-          data: {
-            ...old.data,
-            items: old.data.items.filter((user) => user._id !== id),
-          },
-        }
-      })
+      // Invalidate query để refetch data mới nhất
+      queryClient.invalidateQueries({ queryKey: ['users'] })
       alert('Đã xoá tài khoản người dùng')
     },
     onError: (mutationError) => {
@@ -65,7 +61,21 @@ const AdminUsers = () => { // Component trang user
   const filteredRows = useMemo(() => {
     if (membershipFilter === 'all') return rows
     return rows.filter((row) => row.membership === membershipFilter)
-  }, [rows, membershipFilter])
+  }, [rows, membershipFilter]) // Filter rows theo membership
+
+  // Client-side pagination: tính toán dựa trên filteredRows
+  const totalItems = filteredRows.length // Tổng số items sau khi filter
+  const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE)) // Tổng số trang
+  const currentPage = page // Trang hiện tại
+  const hasPrevPage = currentPage > 1 // Có trang trước không
+  const hasNextPage = currentPage < totalPages // Có trang sau không
+
+  // Slice filteredRows để hiển thị chỉ items của trang hiện tại
+  const paginatedRows = useMemo(() => {
+    const startIndex = (currentPage - 1) * PAGE_SIZE // Index bắt đầu
+    const endIndex = startIndex + PAGE_SIZE // Index kết thúc
+    return filteredRows.slice(startIndex, endIndex) // Lấy items của trang hiện tại
+  }, [filteredRows, currentPage]) // Recalculate khi filteredRows hoặc currentPage thay đổi
 
   const columns = [ // Cột bảng
     {
@@ -134,7 +144,7 @@ const AdminUsers = () => { // Component trang user
           <div className="space-y-2">
             <p className="text-2xl font-semibold text-charcoal">Quản lý tài khoản</p>
             <p className="text-base text-gray-500 flex items-center gap-2">
-              <span className="text-3xl font-bold text-brand">{isLoading ? '...' : filteredRows.length}</span>
+              <span className="text-3xl font-bold text-brand">{isLoading ? '...' : totalItems}</span>
               người dùng
             </p>
             <p className="text-sm text-gray-400">Lọc và giám sát trạng thái membership</p>
@@ -143,7 +153,10 @@ const AdminUsers = () => { // Component trang user
             <FiFilter className="text-gray-500" />
             <select
               value={membershipFilter}
-              onChange={(event) => setMembershipFilter(event.target.value)}
+              onChange={(event) => {
+                setMembershipFilter(event.target.value) // Cập nhật filter
+                setPage(1) // Reset về trang 1 khi filter thay đổi
+              }}
               className="bg-transparent text-sm font-semibold text-gray-700 focus:outline-none"
             >
               {membershipOptions.map((option) => (
@@ -161,7 +174,29 @@ const AdminUsers = () => { // Component trang user
               Không thể tải dữ liệu: {error.message ?? 'Lỗi không xác định'}
             </p>
           )}
-          {!isLoading && !isError && <DataTable columns={columns} rows={filteredRows} />} {/* Bảng dữ liệu */}
+          {!isLoading && !isError && <DataTable columns={columns} rows={paginatedRows} />} {/* Bảng dữ liệu với pagination */}
+          {!isLoading && !isError && (
+            <div className="flex items-center justify-between pt-2 px-2 pb-4 text-sm text-gray-500">
+              <button
+                className="px-4 py-2 rounded-full border border-gray-200 disabled:opacity-40 hover:bg-gray-50 transition"
+                disabled={currentPage <= 1 || hasPrevPage === false}
+                onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+              >
+                Trang trước
+              </button>
+              <span className="text-sm">
+                Trang {currentPage} / {totalPages}
+                {totalItems ? ` · Tổng: ${totalItems} người dùng` : ''}
+              </span>
+              <button
+                className="px-4 py-2 rounded-full border border-gray-200 disabled:opacity-40 hover:bg-gray-50 transition"
+                disabled={hasNextPage === false}
+                onClick={() => setPage((prev) => prev + 1)}
+              >
+                Trang sau
+              </button>
+            </div>
+          )}
         </div>
       </div> {/* Kết thúc nội dung */}
     </PageWrapper> // Kết thúc trang
