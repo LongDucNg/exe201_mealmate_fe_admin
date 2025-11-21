@@ -197,19 +197,6 @@ const AdminFrequency = () => { // Component trang báo cáo
           ))}
         </div> {/* Kết thúc KPI */}
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6"> {/* Phân rã theo thời gian */}
-          {['today', 'thisMonth', 'thisYear'].map((key) => {
-            const item = timeBreakdown[key] ?? {}
-            return (
-              <div key={key} className="bg-white rounded-3xl shadow-card p-6">
-                <p className="text-sm text-gray-500 uppercase">{key}</p>
-                <p className="text-3xl font-semibold text-charcoal mt-3">{formatCurrency(item.revenue ?? 0)}</p>
-                <p className="text-sm text-gray-400 mt-1">{formatNumber(item.transactions ?? 0)} giao dịch</p>
-              </div>
-            )
-          })}
-        </div> {/* Kết thúc phân rã thời gian */}
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6"> {/* Phân theo gói */}
           {packageCards.map((pkg) => (
             <div key={pkg.id} className="bg-white rounded-3xl shadow-card p-6 space-y-3">
