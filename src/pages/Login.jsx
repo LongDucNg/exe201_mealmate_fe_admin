@@ -47,12 +47,12 @@ const Login = () => { // Component login
         </div> {/* Kết thúc tiêu đề */}
         <form onSubmit={handleSubmit} className="space-y-6 text-left"> {/* Form */}
           <div className="text-left space-y-2"> {/* Input email */}
-            <label className="text-base font-semibold text-gray-700">Email</label> {/* Nhãn */}
+            <label className="text-base font-semibold text-gray-700">Username</label> {/* Nhãn */}
             <input
               type="text"
               name="username"
               required
-              placeholder="Nhập email/username"
+              placeholder="Nhập username"
               value={formValues.username}
               onChange={handleChange}
               className="w-full rounded-[32px] border border-[#dfe4ff] px-6 py-5 bg-[#eaf1ff] text-lg text-gray-900 shadow-inner focus:outline-none focus:ring-2 focus:ring-brand/60 placeholder:text-gray-400"
